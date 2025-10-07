@@ -1,0 +1,26 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite" // Pode trocar pra PostgreSQL se quiser
+  url      = "file:./dev.db"
+}
+
+model Device {
+  id          Int       @id @default(autoincrement())
+  name        String
+  port        String    @unique   // ex: "A0", "A1", "A2"
+  description String?
+  readings    Reading[]
+  createdAt   DateTime  @default(now())
+}
+
+model Reading {
+  id          Int       @id @default(autoincrement())
+  deviceId    Int
+  energyWh    Float     // energia acumulada (Wh)
+  durationMin Int       // tempo medido (minutos)
+  createdAt   DateTime  @default(now())
+  device      Device    @relation(fields: [deviceId], references: [id])
+}

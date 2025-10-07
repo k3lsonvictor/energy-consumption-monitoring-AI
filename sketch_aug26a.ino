@@ -1,26 +1,23 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+
+const char* ssid = "NOME_DA_REDE";
+const char* password = "SENHA_DA_REDE";
+const char* serverUrl = "http://192.168.0.10:8000/api/measurements"; // seu backend
+
 const int sensorPin = 34;
 const float VCC_ADC = 3.3;
-const float sensitivity = 0.100; // ACS712 20A = 100 mV/A
+const float sensitivity = 0.100; // ACS712 20A
 const int adcResolution = 4095;
-const float divisorFactor = 5.0 / 3.3; // sensor 5V, ADC 3.3V
-const float lineVoltage = 220.0;       // tensão da rede em volts
-const float powerFactor = 0.85;        // fator de potência típico para ventiladores
-
-const int sampleDelayUs = 100;         // microsegundos entre amostras
-const int samplesPerRMS = 500;         // amostras por cálculo RMS
-const unsigned long printIntervalMs = 5000; // imprimir RMS/potência a cada 5s
-const unsigned long totalMinutes = 10;       // total do experimento
-const float noiseThreshold = 0.05;           // corrente mínima considerada (A)
-const int movingAverageWindow = 10;          // janela média móvel
-
-// variável global para offset calibrado
+const float divisorFactor = 5.0 / 3.3;
+const float lineVoltage = 220.0;
+const float powerFactor = 0.85;
+const int samplesPerRMS = 500;
+const int sampleDelayUs = 100;
+const float noiseThreshold = 0.05;
 float voltageOffset = 0;
 
-// buffer para média móvel
-float rmsBuffer[movingAverageWindow];
-int bufferIndex = 0;
-
-// função para calibrar offset com carga desligada
+// === Calibração ===
 void calibrateOffset(int numSamples = 1000) {
   float sum = 0;
   for (int i = 0; i < numSamples; i++) {
@@ -30,85 +27,68 @@ void calibrateOffset(int numSamples = 1000) {
     sum += voltage_sensor;
     delayMicroseconds(sampleDelayUs);
   }
-  voltageOffset = sum / numSamples; // média das leituras com carga zero
+  voltageOffset = sum / numSamples;
   Serial.print("Offset calibrado: ");
   Serial.println(voltageOffset, 3);
 }
 
-// função para calcular média móvel do RMS
-float movingAverage(float newValue) {
-  rmsBuffer[bufferIndex] = newValue;
-  bufferIndex = (bufferIndex + 1) % movingAverageWindow;
-  float sum = 0;
-  for (int i = 0; i < movingAverageWindow; i++) sum += rmsBuffer[i];
-  return sum / movingAverageWindow;
-}
-
 void setup() {
   Serial.begin(115200);
-  Serial.println("Calibrando offset, mantenha o ventilador desligado...");
-  calibrateOffset();
-  Serial.println("Calibração concluída. Iniciando medições...");
+  delay(1000);
+  Serial.println("Conectando ao Wi-Fi...");
+  WiFi.begin(ssid, password);
 
-  // inicializa buffer RMS com 0
-  for (int i = 0; i < movingAverageWindow; i++) rmsBuffer[i] = 0;
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("\nWi-Fi conectado!");
+  Serial.print("IP: ");
+  Serial.println(WiFi.localIP());
+
+  calibrateOffset();
 }
 
 void loop() {
-  float energyWh = 0.0;
-  unsigned long experimentStart = millis();
-  unsigned long lastPrint = 0;
-  unsigned long lastLoopMillis = millis();
+  float sumSquares = 0;
 
-  while (millis() - experimentStart < totalMinutes * 60UL * 1000UL) {
-    float sumSquares = 0;
-    unsigned long loopStart = millis();
-
-    // calcular RMS da corrente
-    for (int i = 0; i < samplesPerRMS; i++) {
-      int rawValue = analogRead(sensorPin);
-      float voltage_adc = (rawValue * VCC_ADC) / adcResolution;
-      float voltage_sensor = voltage_adc * divisorFactor;
-      float currentInstant = (voltage_sensor - voltageOffset) / sensitivity;
-      sumSquares += currentInstant * currentInstant;
-      delayMicroseconds(sampleDelayUs);
-    }
-
-    float rmsCurrent = sqrt(sumSquares / samplesPerRMS);
-
-    // aplicar threshold para ignorar ruído
-    if (rmsCurrent < noiseThreshold) rmsCurrent = 0;
-
-    // aplicar média móvel
-    rmsCurrent = movingAverage(rmsCurrent);
-
-    // potência real considerando fator de potência
-    float powerWatts = rmsCurrent * lineVoltage * powerFactor;
-
-    // calcular delta de tempo real em horas
-    float deltaTimeHours = (millis() - lastLoopMillis) / 3600000.0;
-    lastLoopMillis = millis();
-
-    energyWh += powerWatts * deltaTimeHours;
-
-    // imprimir corrente, potência e energia a cada 5s
-    if (millis() - lastPrint >= printIntervalMs) {
-      Serial.print("Corrente RMS: ");
-      Serial.print(rmsCurrent, 2);
-      Serial.print(" A, Potência: ");
-      Serial.print(powerWatts, 2);
-      Serial.print(" W, Energia acumulada: ");
-      Serial.print(energyWh, 3);
-      Serial.println(" Wh");
-      lastPrint = millis();
-    }
+  for (int i = 0; i < samplesPerRMS; i++) {
+    int rawValue = analogRead(sensorPin);
+    float voltage_adc = (rawValue * VCC_ADC) / adcResolution;
+    float voltage_sensor = voltage_adc * divisorFactor;
+    float currentInstant = (voltage_sensor - voltageOffset) / sensitivity;
+    sumSquares += currentInstant * currentInstant;
+    delayMicroseconds(sampleDelayUs);
   }
 
-  // resumo final após 10 minutos
-  Serial.println("----- 10 minutos concluídos -----");
-  Serial.print("Energia total acumulada: ");
-  Serial.print(energyWh, 3);
-  Serial.println(" Wh");
+  float rmsCurrent = sqrt(sumSquares / samplesPerRMS);
+  if (rmsCurrent < noiseThreshold) rmsCurrent = 0;
 
-  while (true); // pausa final
+  float powerWatts = rmsCurrent * lineVoltage * powerFactor;
+
+  // Enviar dados para o servidor
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(serverUrl);
+    http.addHeader("Content-Type", "application/json");
+
+    String jsonPayload = "{\"current\": " + String(rmsCurrent, 3) +
+                         ", \"power\": " + String(powerWatts, 3) +
+                         ", \"timestamp\": " + String(millis()) + "}";
+
+    int httpResponseCode = http.POST(jsonPayload);
+
+    if (httpResponseCode > 0) {
+      Serial.print("Dados enviados: ");
+      Serial.println(jsonPayload);
+    } else {
+      Serial.print("Erro HTTP: ");
+      Serial.println(httpResponseCode);
+    }
+
+    http.end();
+  }
+
+  delay(5000); // enviar a cada 5 segundos
 }
