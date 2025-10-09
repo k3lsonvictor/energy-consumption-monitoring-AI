@@ -8,10 +8,16 @@ const prisma = new PrismaClient();
 app.use(cors());
 app.use(express.json());
 
+// Listar todos os dispositivos
+app.get("/devices", async (req, res) => {
+  const devices = await prisma.device.findMany();
+  res.json(devices);
+});
+
 // Registrar novo dispositivo
 app.post("/devices", async (req, res) => {
-  const { name, description } = req.body;
-  const device = await prisma.device.create({ data: { name, description } });
+  const { name, description, port } = req.body;
+  const device = await prisma.device.create({ data: { name, description, port } });
   res.json(device);
 });
 
@@ -19,7 +25,7 @@ app.post("/readings", async (req, res) => {
     const { port, energyWh, durationMin } = req.body;
   
     // Encontra o dispositivo pela porta
-    const device = await prisma.device.findUnique({ where: { port } });
+    const device = await prisma.device.findUnique({ where: { port: port.toString() } });
     if (!device) {
       return res.status(404).json({ error: `Nenhum dispositivo cadastrado na porta ${port}` });
     }
