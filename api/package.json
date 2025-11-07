@@ -5,8 +5,10 @@
   },
   "dependencies": {
     "@prisma/client": "^6.17.0",
+    "axios": "^1.7.9",
     "cors": "^2.8.5",
     "express": "^5.1.0",
+    "openai": "^4.73.0",
     "prisma": "^6.17.0"
   },
   "devDependencies": {

@@ -1,0 +1,82 @@
+// EXEMPLO: Como adicionar um novo provedor de IA
+// Este é um exemplo para Anthropic Claude (não está implementado, apenas mostra o padrão)
+
+import Anthropic from "@anthropic-ai/sdk";
+import { AIAgent } from "./AIAgent.js";
+import { config } from "../../config/env.js";
+
+/**
+ * Implementação do agente Anthropic Claude
+ * Para usar, descomente e instale: npm install @anthropic-ai/sdk
+ */
+export class AnthropicAgent extends AIAgent {
+  constructor() {
+    super();
+    this.client = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY || "your-api-key",
+    });
+    this.model = config.ai.model || "claude-3-sonnet-20240229";
+    this.maxTokens = config.ai.maxTokens || 200;
+  }
+
+  async generateResponse(userMessage, context = {}, systemPrompt = null) {
+    const defaultSystemPrompt = 
+      "Você é um assistente virtual especializado em monitoramento de consumo de energia elétrica. " +
+      "Responda sempre em português brasileiro de forma amigável e clara.";
+
+    const systemMessage = systemPrompt || defaultSystemPrompt;
+
+    // Prepara contexto formatado
+    const contextoFormatado = context.dadosConsumo
+      ? `
+Dados de consumo disponíveis:
+${JSON.stringify(context.dadosConsumo, null, 2)}
+
+A mensagem do usuário foi: "${userMessage}"
+
+Responda de forma amigável, clara e em português brasileiro. Use os dados de consumo para fornecer informações precisas.
+Se o usuário perguntar sobre consumo, custos, dispositivos ou estatísticas, use os dados fornecidos acima.
+Mantenha a resposta concisa e útil, entre 2-4 frases.
+`
+      : userMessage;
+
+    try {
+      const message = await this.client.messages.create({
+        model: this.model,
+        max_tokens: this.maxTokens,
+        system: systemMessage,
+        messages: [
+          {
+            role: "user",
+            content: contextoFormatado,
+          },
+        ],
+      });
+
+      return message.content[0].text;
+    } catch (error) {
+      console.error("Erro ao gerar resposta com Anthropic:", error);
+      throw new Error(`Erro ao gerar resposta: ${error.message}`);
+    }
+  }
+
+  async validate() {
+    try {
+      // Testa se a API key é válida
+      await this.client.messages.create({
+        model: this.model,
+        max_tokens: 10,
+        messages: [{ role: "user", content: "test" }],
+      });
+      return true;
+    } catch (error) {
+      console.error("Erro ao validar Anthropic:", error);
+      return false;
+    }
+  }
+}
+
+// Depois, adicione no AIAgentFactory.js:
+// case "anthropic":
+//   return new AnthropicAgent();
+
