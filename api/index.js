@@ -6,6 +6,7 @@ import deviceRoutes from "./routes/deviceRoutes.js";
 import readingRoutes from "./routes/readingRoutes.js";
 import webhookRoutes from "./routes/webhookRoutes.js";
 import consumoRoutes from "./routes/consumoRoutes.js";
+import testRoutes from "./routes/testRoutes.js";
 
 const app = express();
 
@@ -18,6 +19,7 @@ app.use("/devices", deviceRoutes);
 app.use("/readings", readingRoutes);
 app.use("/webhook", webhookRoutes);
 app.use("/consumo", consumoRoutes);
+app.use("/test", testRoutes);
 
 // Health check
 app.get("/health", (req, res) => {

@@ -63,16 +63,56 @@ void handleRoot() {
 
 // Salvar credenciais Wi-Fi
 void handleSave() {
+  Serial.println("\n═══════════════════════════════════");
+  Serial.println("  📥 REQUISIÇÃO /save RECEBIDA!");
+  Serial.println("═══════════════════════════════════");
+  
+  // Debug: mostrar método e URI
+  Serial.print("Método: ");
+  Serial.println(server.method() == HTTP_POST ? "POST" : "GET");
+  Serial.print("URI: ");
+  Serial.println(server.uri());
+  Serial.print("Número de argumentos: ");
+  Serial.println(server.args());
+  
+  // Mostrar todos os argumentos
+  for (int i = 0; i < server.args(); i++) {
+    Serial.print("  ");
+    Serial.print(server.argName(i));
+    Serial.print(" = ");
+    if (server.argName(i) == "password") {
+      Serial.println("***");
+    } else {
+      Serial.println(server.arg(i));
+    }
+  }
+  
   String ssid = server.arg("ssid");
   String password = server.arg("password");
+  
+  Serial.print("SSID extraído: '");
+  Serial.print(ssid);
+  Serial.println("'");
+  Serial.print("Password: ");
+  Serial.println(password.length() > 0 ? "***" : "(vazia)");
 
+  if (ssid.length() == 0) {
+    Serial.println("❌ ERRO: SSID vazio!");
+    String errorMsg = "<html><head><meta name='viewport' content='width=device-width, initial-scale=1'><style>body{font-family:Arial;text-align:center;margin-top:50px;background:#f5f5f5;} .container{max-width:400px;margin:0 auto;background:white;padding:30px;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,0.1);} h2{color:#dc3545;}</style></head><body><div class='container'><h2>❌ Erro</h2><p>SSID não pode estar vazio!</p><p><a href='/'>Voltar</a></p></div></body></html>";
+    server.send(400, "text/html", errorMsg);
+    return;
+  }
+
+  Serial.println("💾 Salvando credenciais...");
   preferences.begin("wifi-config", false);
   preferences.putString("ssid", ssid);
   preferences.putString("password", password);
   preferences.end();
+  Serial.println("✅ Credenciais salvas na memória!");
 
   String msg = "<html><head><meta name='viewport' content='width=device-width, initial-scale=1'><style>body{font-family:Arial;text-align:center;margin-top:50px;background:#f5f5f5;} .container{max-width:400px;margin:0 auto;background:white;padding:30px;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,0.1);} h2{color:#28a745;}</style></head><body><div class='container'><h2>✅ Wi-Fi salvo!</h2><p><strong>Rede:</strong> " + ssid + "</p><p>O ESP32 será reiniciado para conectar...</p><p style='color:#666;font-size:14px;'>Aguarde alguns segundos.</p></div></body></html>";
   server.send(200, "text/html", msg);
+  Serial.println("✅ Resposta enviada ao cliente");
   
   Serial.println("\n✅ Credenciais salvas!");
   Serial.print("Rede: ");
@@ -130,17 +170,33 @@ void startAccessPoint() {
   Serial.println("\n🔹 Iniciando modo Access Point...");
   WiFi.softAP("ESP32_Config", "12345678");
   
+  IPAddress IP = WiFi.softAPIP();
+  
   Serial.println("═══════════════════════════════════");
   Serial.println("  📶 MODO CONFIGURAÇÃO ATIVO");
   Serial.println("═══════════════════════════════════");
   Serial.println("Conecte-se à rede: ESP32_Config");
   Serial.println("Senha: 12345678");
+  Serial.print("IP do Access Point: ");
+  Serial.println(IP);
   Serial.println("Acesse: http://192.168.4.1");
   Serial.println("═══════════════════════════════════");
 
   server.on("/", handleRoot);
   server.on("/save", HTTP_POST, handleSave);
+  
+  // Handler para debug de requisições não encontradas
+  server.onNotFound([]() {
+    Serial.print("⚠️  Requisição não encontrada: ");
+    Serial.println(server.uri());
+    server.send(404, "text/plain", "Not Found");
+  });
+  
   server.begin();
+  Serial.println("✅ Servidor web iniciado!");
+  Serial.println("✅ Rotas configuradas:");
+  Serial.println("   GET  /");
+  Serial.println("   POST /save");
 }
 
 // Processar requisições do servidor web (chamar no loop)

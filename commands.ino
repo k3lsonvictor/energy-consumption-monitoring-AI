@@ -150,7 +150,20 @@ void processSerialCommands() {
     prefs.clear();
     prefs.end();
     Serial.println("✅ Credenciais Wi-Fi resetadas!");
-    Serial.println("Reinicie o ESP32 para entrar em modo configuração.");
+    Serial.println("Reiniciando ESP32 em 2 segundos para entrar em modo configuração...");
+    delay(2000);
+    ESP.restart();
+  } else if (command == "resetall") {
+    // Resetar tudo: WiFi e energia
+    Preferences prefs;
+    prefs.begin("wifi-config", false);
+    prefs.clear();
+    prefs.end();
+    resetEnergy();
+    Serial.println("✅ Tudo resetado (WiFi + Energia)!");
+    Serial.println("Reiniciando ESP32 em 2 segundos...");
+    delay(2000);
+    ESP.restart();
   }
 }
 
@@ -161,7 +174,8 @@ void printHelp() {
   Serial.println("'status' - Mostrar status atual");
   Serial.println("'time' - Mostrar tempo para próximo salvamento");
   Serial.println("'wifi' - Mostrar status do Wi-Fi");
-  Serial.println("'resetwifi' - Resetar credenciais Wi-Fi");
+  Serial.println("'resetwifi' - Resetar credenciais Wi-Fi (reinicia automaticamente)");
+  Serial.println("'resetall' - Resetar tudo (WiFi + Energia)");
   Serial.println("'fix' - Calibrar e travar offset (RECOMENDADO)");
   Serial.println("'calibrate' - Recalibrar offset de corrente");
   Serial.println("'adjust' - Ajustar offset para valor atual");

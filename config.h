@@ -19,7 +19,7 @@ const float sensitivity = 0.100; // ACS712 20A = 100mV/A
 const float divisorFactor = 5.0 / 3.3; // Conversão ADC (3.3V) para sensor (5V)
 
 // Configurações do sensor de tensão (ZMPT101B)
-float voltageSensitivity = 0.0017; // Sensibilidade (ajuste até bater com 220V RMS)
+float voltageSensitivity = 0.00198; // Sensibilidade (ajustado para 213V - era 0.0017 para 248V)
 
 // Configurações de medição
 const float lineVoltage = 220.0; // Tensão nominal (fallback)

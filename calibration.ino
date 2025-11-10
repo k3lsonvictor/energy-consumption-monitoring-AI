@@ -3,7 +3,7 @@
 // ==========================================
 
 // Calibrar offset do sensor de corrente (ACS712)
-void calibrateOffset(int numSamples = 1000) {
+void calibrateOffset(int numSamples) {
   float sum = 0;
   for (int i = 0; i < numSamples; i++) {
     int rawValue = analogRead(sensorPin);
@@ -18,7 +18,7 @@ void calibrateOffset(int numSamples = 1000) {
 }
 
 // Calibrar offset do sensor de tensão (ZMPT101B)
-void calibrateVoltageOffset(int numSamples = 1000) {
+void calibrateVoltageOffset(int numSamples) {
   float sum = 0;
   Serial.println("Calibrando offset de tensão (ZMPT101B)...");
   Serial.println("Aguarde, medindo offset DC...");

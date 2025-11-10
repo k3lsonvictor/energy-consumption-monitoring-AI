@@ -12,7 +12,7 @@
 // ==========================================
 
 // Offsets dos sensores
-float voltageOffsetCurrent = 0;              // Offset do sensor de corrente (ACS712)
+float voltageOffsetCurrent = 2.5;            // Offset do sensor de corrente (ACS712) - 2.5V quando não há corrente
 float voltageOffsetVoltage = 2.5;            // Offset do sensor de tensão (ZMPT101B)
 
 // Energia e controle
@@ -23,6 +23,36 @@ unsigned long lastSaveTime = 0;               // Última vez que salvou no banco
 // Controles
 bool autoOffsetAdjust = false;               // Desabilitar ajuste automático por padrão
 bool useRealVoltage = true;                  // Usar tensão real ou fixa
+
+// ==========================================
+// DECLARAÇÕES DE FUNÇÕES (PROTOTYPES)
+// ==========================================
+
+// Funções de calibração
+void calibrateOffset(int numSamples = 1000);
+void calibrateVoltageOffset(int numSamples = 1000);
+
+// Funções de sensores
+void measureSensors(float& rmsCurrent, float& rmsVoltage);
+void checkAndAdjustOffset(float rmsCurrent);
+
+// Funções EEPROM
+void loadEnergyFromEEPROM();
+void saveEnergyToEEPROM();
+void resetEnergy();
+
+// Funções WiFi
+void loadWiFiCredentials();
+bool connectToWiFi();
+void startAccessPoint();
+void handleWiFiManager();
+
+// Funções HTTP
+void sendDataToServer(float energy, float duration);
+
+// Funções de comandos
+void processSerialCommands();
+void printHelp();
 
 // ==========================================
 // SETUP
@@ -82,7 +112,8 @@ void loop() {
   unsigned long currentTime = millis();
   
   // Processar servidor web (se estiver em modo AP para configuração)
-  if (WiFi.status() != WL_CONNECTED && WiFi.getMode() == WIFI_AP) {
+  // IMPORTANTE: Sempre processar se estiver em modo AP
+  if (WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA) {
     handleWiFiManager();
   }
   
