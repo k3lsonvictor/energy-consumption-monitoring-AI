@@ -53,13 +53,24 @@ api/
 
 ## 🔌 Endpoints
 
-- `GET /devices` - Lista dispositivos
-- `POST /devices` - Cria dispositivo
+### Dispositivos
+- `GET /devices` - Lista todos os dispositivos
+- `POST /devices` - Cria um novo dispositivo
+- `POST /devices/associar` - Associa um nome a uma entrada (pino) do ESP32
+- `GET /devices/:id` - Busca dispositivo por ID
+- `PUT /devices/:id` - Atualiza um dispositivo
+- `GET /devices/porta/:porta` - Busca dispositivo por porta/pino
 - `GET /devices/:id/readings` - Leituras do dispositivo
 - `GET /devices/:id/summary` - Resumo do dispositivo
+
+### Leituras e Consumo
 - `POST /readings` - Registra leitura
 - `GET /consumo` - Consulta consumo
+
+### Webhooks
 - `POST /webhook/chatwoot` - Webhook Chatwoot
+
+### Sistema
 - `GET /health` - Health check
 
 ## ⚙️ Variáveis de Ambiente

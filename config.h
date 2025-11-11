@@ -4,7 +4,7 @@
 
 // Configurações Wi-Fi
 // Nota: SSID e password são salvos via Preferences (WiFi Manager)
-const char* serverUrl = "http://192.168.1.110:3000/readings";
+const char* serverUrl = "http://192.168.1.110:5000/readings";
 
 // Pinos dos sensores
 const int sensorPin = 34;        // Sensor de corrente (ACS712)
