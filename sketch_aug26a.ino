@@ -24,6 +24,14 @@ unsigned long lastSaveTime = 0;               // Última vez que salvou no banco
 bool autoOffsetAdjust = false;               // Desabilitar ajuste automático por padrão
 bool useRealVoltage = true;                  // Usar tensão real ou fixa
 
+// Acumuladores para cálculo de potência ativa por amostragem instantânea
+float sumV2 = 0.0;                           // Soma de v² (tensão instantânea ao quadrado)
+float sumI2 = 0.0;                           // Soma de i² (corrente instantânea ao quadrado)
+float sumP = 0.0;                            // Soma de v * i (potência instantânea)
+unsigned long samples = 0;                   // Contador de amostras válidas
+unsigned long lastCalculationTime = 0;       // Última vez que calculou valores RMS e potência
+const unsigned long calculationIntervalMs = 1000; // Intervalo para cálculo (1 segundo)
+
 // ==========================================
 // DECLARAÇÕES DE FUNÇÕES (PROTOTYPES)
 // ==========================================
@@ -35,6 +43,8 @@ void calibrateVoltageOffset(int numSamples = 1000);
 // Funções de sensores
 void measureSensors(float& rmsCurrent, float& rmsVoltage);
 void checkAndAdjustOffset(float rmsCurrent);
+void sampleInstantaneousValues();            // Amostragem instantânea de tensão e corrente
+void calculatePowerValues(float& rmsVoltage, float& rmsCurrent, float& realPower, float& apparentPower, float& powerFactor); // Calcular valores RMS e potência
 
 // Funções EEPROM
 void loadEnergyFromEEPROM();
@@ -48,7 +58,7 @@ void startAccessPoint();
 void handleWiFiManager();
 
 // Funções HTTP
-void sendDataToServer(float energy, float duration);
+void sendDataToServer(float energy, float duration, float realPower = 0, float apparentPower = 0, float powerFactor = 0);
 
 // Funções de comandos
 void processSerialCommands();
@@ -117,90 +127,97 @@ void loop() {
     handleWiFiManager();
   }
   
-  // Processar comandos Serial
+  // Processar comandos Serial (não bloqueante)
   processSerialCommands();
   
-  // Medir sensores
-  float rmsCurrent = 0;
-  float rmsVoltage = 0;
-  measureSensors(rmsCurrent, rmsVoltage);
+  // AMOSTRAGEM CONTÍNUA: fazer amostragem instantânea de tensão e corrente
+  sampleInstantaneousValues();
   
-  // Verificar e ajustar offset (se necessário)
-  checkAndAdjustOffset(rmsCurrent);
-  
-  // Calcular potência e energia
-  float powerWatts = rmsCurrent * rmsVoltage * powerFactor;
-  float energyWh = powerWatts * (5.0 / 3600.0); // energia em Wh (5 segundos = 5/3600 horas)
-  float durationMin = 5.0 / 60.0; // duração em minutos (5 segundos = 5/60 minutos)
-  
-  // Acumular energia total APENAS se houver leituras válidas
-  int rawValue = analogRead(sensorPin);
-  if (rawValue > 0) {
-    totalEnergyWh += energyWh;
-    saveCounter++;
-  } else {
-    // Se ADC = 0, não acumular e avisar
-    static unsigned long lastErrorTime = 0;
-    if (millis() - lastErrorTime > 10000) {
-      Serial.println("❌ ERRO CRÍTICO: ADC retornando 0! Sensor desconectado!");
-      lastErrorTime = millis();
+  // Calcular valores RMS e potência a cada intervalo configurado (1 segundo)
+  if (lastCalculationTime == 0 || (currentTime - lastCalculationTime >= calculationIntervalMs)) {
+    // Valores calculados
+    float rmsVoltage = 0;
+    float rmsCurrent = 0;
+    float realPower = 0;
+    float apparentPower = 0;
+    float measuredPowerFactor = 0;
+    
+    // Calcular valores a partir dos acumuladores
+    calculatePowerValues(rmsVoltage, rmsCurrent, realPower, apparentPower, measuredPowerFactor);
+    
+    // Verificar e ajustar offset (se necessário)
+    checkAndAdjustOffset(rmsCurrent);
+    
+    // Calcular energia acumulada (usando potência real medida)
+    // Usar valor absoluto da potência para energia (pode ser negativa se houver geração)
+    if (samples > 0 && abs(realPower) > 0.001) {
+      float durationHours = calculationIntervalMs / 3600000.0; // Converter ms para horas
+      float energyWh = abs(realPower) * durationHours;
+      totalEnergyWh += energyWh;
+      saveCounter++;
     }
-    delay(5000);
-    return; // Pular esta iteração
+    
+    // Mostrar valores no Serial Monitor
+    Serial.print("Amostras: ");
+    Serial.print(samples);
+    Serial.print(", Vrms: ");
+    Serial.print(rmsVoltage, 1);
+    if (useRealVoltage) {
+      Serial.print(" V (REAL)");
+    } else {
+      Serial.print(" V (FIXA)");
+    }
+    Serial.print(", Irms: ");
+    Serial.print(rmsCurrent, 6);
+    Serial.print(" A, P_ativa: ");
+    Serial.print(realPower, 6);
+    Serial.print(" W, S: ");
+    Serial.print(apparentPower, 6);
+    Serial.print(" VA, FP: ");
+    Serial.print(measuredPowerFactor, 6);
+    Serial.print(", Energia total: ");
+    Serial.print(totalEnergyWh, 6);
+    Serial.print(" Wh");
+    
+    // Calcular tempo restante para próximo salvamento
+    unsigned long timeToNextSave = saveIntervalMs - (currentTime - lastSaveTime);
+    if (timeToNextSave < saveIntervalMs) {
+      Serial.print(", Próximo save em: ");
+      Serial.print(timeToNextSave / 1000);
+      Serial.print(" s");
+    }
+    Serial.println();
+    
+    // Resetar acumuladores para próximo intervalo
+    sumV2 = 0.0;
+    sumI2 = 0.0;
+    sumP = 0.0;
+    samples = 0;
+    lastCalculationTime = currentTime;
   }
   
-  // Debug: mostrar valores atuais
-  float voltage_adc = (rawValue * VCC_ADC) / adcResolution;
-  float voltage_sensor = voltage_adc * divisorFactor;
-  float currentInstant = (voltage_sensor - voltageOffsetCurrent) / sensitivity;
-  
-  // Calcular tempo restante para próximo salvamento
-  unsigned long timeToNextSave = saveIntervalMs - (currentTime - lastSaveTime);
-  
-  // Mostrar valores no Serial Monitor
-  Serial.print("ADC: ");
-  Serial.print(rawValue);
-  if (rawValue == 0) {
-    Serial.print(" (ERRO!)");
-  }
-  Serial.print(", V_ADC: ");
-  Serial.print(voltage_adc, 3);
-  Serial.print(" V, V_Sensor: ");
-  Serial.print(voltage_sensor, 3);
-  Serial.print(" V, Offset: ");
-  Serial.print(voltageOffsetCurrent, 3);
-  Serial.print(" V, Corrente instantânea: ");
-  Serial.print(currentInstant, 4);
-  Serial.print(" A, Corrente RMS: ");
-  Serial.print(rmsCurrent, 3);
-  Serial.print(" A, Tensão RMS: ");
-  Serial.print(rmsVoltage, 1);
-  if (useRealVoltage) {
-    Serial.print(" V (REAL)");
-  } else {
-    Serial.print(" V (FIXA)");
-  }
-  Serial.print(", Potência: ");
-  Serial.print(powerWatts, 2);
-  Serial.print(" W, Energia (5s): ");
-  Serial.print(energyWh, 6);
-  Serial.print(" Wh, Total acumulado: ");
-  Serial.print(totalEnergyWh, 6);
-  Serial.print(" Wh, Próximo save em: ");
-  Serial.print(timeToNextSave / 1000);
-  Serial.println(" s");
-  
-  // Salvar na EEPROM a cada 10 leituras (50 segundos)
+  // Salvar na EEPROM a cada 10 cálculos (10 segundos)
   if (saveCounter >= 10) {
     saveEnergyToEEPROM();
     saveCounter = 0;
-    Serial.println("Energia salva na EEPROM!");
+    Serial.println("💾 Energia salva na EEPROM!");
   }
   
   // Enviar dados para o servidor a cada 10 minutos
   if (WiFi.status() == WL_CONNECTED) {
     if (lastSaveTime == 0 || (currentTime - lastSaveTime >= saveIntervalMs)) {
-      sendDataToServer(totalEnergyWh, 10.0);
+      // Calcular valores finais para envio
+      float rmsVoltage = 0;
+      float rmsCurrent = 0;
+      float realPower = 0;
+      float apparentPower = 0;
+      float measuredPowerFactor = 0;
+      
+      if (samples > 0) {
+        calculatePowerValues(rmsVoltage, rmsCurrent, realPower, apparentPower, measuredPowerFactor);
+      }
+      
+      sendDataToServer(totalEnergyWh, 10.0, realPower, apparentPower, measuredPowerFactor);
       lastSaveTime = currentTime;
     }
   } else {
@@ -212,5 +229,6 @@ void loop() {
     }
   }
   
-  delay(5000); // medir a cada 5 segundos
+  // Pequeno delay para não sobrecarregar o processador
+  delayMicroseconds(100);
 }

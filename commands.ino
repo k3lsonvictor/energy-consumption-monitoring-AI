@@ -14,7 +14,18 @@ void processSerialCommands() {
     resetEnergy();
   } else if (command == "save") {
     // Forçar salvamento no banco
-    sendDataToServer(totalEnergyWh, 10.0);
+    // Calcular valores atuais antes de enviar
+    float rmsVoltage = 0;
+    float rmsCurrent = 0;
+    float realPower = 0;
+    float apparentPower = 0;
+    float measuredPowerFactor = 0;
+    
+    if (samples > 0) {
+      calculatePowerValues(rmsVoltage, rmsCurrent, realPower, apparentPower, measuredPowerFactor);
+    }
+    
+    sendDataToServer(totalEnergyWh, 10.0, realPower, apparentPower, measuredPowerFactor);
     lastSaveTime = millis();
   } else if (command == "status") {
     Serial.println("=== STATUS DO SISTEMA ===");

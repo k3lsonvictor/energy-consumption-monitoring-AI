@@ -3,7 +3,7 @@
 // ==========================================
 
 // Enviar dados para o servidor
-void sendDataToServer(float energy, float duration) {
+void sendDataToServer(float energy, float duration, float realPower, float apparentPower, float powerFactor) {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("⚠️  WiFi desconectado! Não é possível salvar no banco.");
     return;
@@ -16,9 +16,13 @@ void sendDataToServer(float energy, float duration) {
 
   String port = "1";
   
+  // Montar JSON com todos os dados de potência
   String jsonPayload = "{\"port\": \"" + port + "\"" +
                        ", \"energyWh\": " + String(energy, 6) +
-                       ", \"durationMin\": " + String(duration) + "}";
+                       ", \"durationMin\": " + String(duration) +
+                       ", \"realPower\": " + String(realPower, 2) +
+                       ", \"apparentPower\": " + String(apparentPower, 2) +
+                       ", \"powerFactor\": " + String(powerFactor, 3) + "}";
 
   Serial.print("Enviando: ");
   Serial.println(jsonPayload);
@@ -32,6 +36,14 @@ void sendDataToServer(float energy, float duration) {
     Serial.print("Energia acumulada: ");
     Serial.print(energy, 6);
     Serial.println(" Wh");
+    Serial.print("Potência ativa: ");
+    Serial.print(realPower, 2);
+    Serial.println(" W");
+    Serial.print("Potência aparente: ");
+    Serial.print(apparentPower, 2);
+    Serial.println(" VA");
+    Serial.print("Fator de potência: ");
+    Serial.println(powerFactor, 3);
     Serial.print("Dados enviados: ");
     Serial.println(jsonPayload);
     
