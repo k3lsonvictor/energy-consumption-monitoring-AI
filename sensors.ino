@@ -76,6 +76,10 @@ void sampleInstantaneousValues() {
     float instantPower = voltageInstant * currentInstant;
     sumP += instantPower;
     
+    // Acumular valor ADC de corrente para recalibração de offset (quando não há carga)
+    // Salva valores crus, sem conversão
+    sumCurrentADC += rawCurrent;
+    
     samples++;
     
     // Debug: mostrar algumas amostras para diagnóstico
@@ -139,34 +143,74 @@ void calculatePowerValues(float& rmsVoltage, float& rmsCurrent, float& realPower
     // NÃO zerar corrente aqui - deixar o valor real para cálculo de potência
     // Apenas zerar para exibição se necessário
     
+    // Detectar ausência de carga e recalibrar offset automaticamente
+    // Só recalibrar quando realmente parece "sem carga" (corrente baixa E potência baixa)
+    if (rmsCurrent < noLoadThreshold && abs(realPower) < 1.0) {
+      // Calcular média do ADC de corrente (em contagens ADC: 0-4095)
+      double avgAdc = sumCurrentADC / samples;
+      
+      // Converter ADC -> Volts (usando divisorFactor para converter de 3.3V ADC para 5V sensor)
+      float newOffsetVolts = (avgAdc * VCC_ADC / adcResolution) * divisorFactor;
+      
+      // Recalibrar offset usando filtro EWMA (Exponentially Weighted Moving Average)
+      // 90% do offset antigo + 10% do novo offset (ajuste suave)
+      voltageOffsetCurrent = (voltageOffsetCurrent * 0.9f) + (newOffsetVolts * 0.1f);
+      
+      // Debug: mostrar recalibração
+      static unsigned long lastAutoCalibTime = 0;
+      if (millis() - lastAutoCalibTime > 10000) { // A cada 10 segundos
+        Serial.print("🔧 Auto-calibração: Offset ajustado para ");
+        Serial.print(voltageOffsetCurrent, 3);
+        Serial.print(" V (Irms=");
+        Serial.print(rmsCurrent, 3);
+        Serial.print(" A, P=");
+        Serial.print(realPower, 3);
+        Serial.println(" W)");
+        lastAutoCalibTime = millis();
+      }
+    }
+    
     // Calcular potência ativa: P = (1/N) * sum(p_k) = (1/N) * sum(v_k * i_k)
     realPower = sumP / samples;
     
-    // Se a potência for negativa, pode ser:
-    // 1. Fase invertida (problema de conexão ou calibração)
-    // 2. Geração de energia (inversor, etc)
-    // 3. Offset incorreto causando deslocamento de fase
-    // Usar valor absoluto para potência e FP (assumindo que é erro de calibração/fase)
-    bool powerIsNegative = (realPower < 0);
-    if (powerIsNegative) {
-      static unsigned long lastNegativePowerWarning = 0;
-      if (millis() - lastNegativePowerWarning > 10000) {
-        Serial.println("⚠️  AVISO: Potência negativa detectada!");
-        Serial.println("   Possíveis causas:");
-        Serial.println("   1. Offset incorreto (execute 'calibrate')");
-        Serial.println("   2. Fase invertida (verifique conexões)");
-        Serial.println("   3. Geração de energia (inversor)");
-        Serial.print("   Usando valor absoluto: ");
-        Serial.print(abs(realPower), 2);
-        Serial.println(" W");
-        lastNegativePowerWarning = millis();
+    // Limiares para considerar "sem carga" (deadband para eliminar ruído)
+    const float P_NOLOAD_THRESHOLD = 1.0f;   // até 1 W consideramos "zero"
+    const float I_NOLOAD_THRESHOLD = 0.15f;  // até 150 mA consideramos "sem carga"
+    
+    // Se a potência for negativa, verificar se é ruído ou problema real
+    if (realPower < 0) {
+      if (abs(realPower) > P_NOLOAD_THRESHOLD) {
+        // Potência negativa significativa: pode ser fase invertida / geração / ligação estranha
+        static unsigned long lastNegativePowerWarning = 0;
+        if (millis() - lastNegativePowerWarning > 10000) {
+          Serial.println("⚠️  AVISO: Potência negativa detectada!");
+          Serial.println("   Possíveis causas:");
+          Serial.println("   1. Offset incorreto (execute 'calibrate')");
+          Serial.println("   2. Fase invertida (verifique conexões)");
+          Serial.println("   3. Geração de energia (inversor)");
+          Serial.print("   Usando valor absoluto: ");
+          Serial.print(abs(realPower), 2);
+          Serial.println(" W");
+          lastNegativePowerWarning = millis();
+        }
+        // Usar valor absoluto para potência significativa
+        realPower = abs(realPower);
+      } else {
+        // É só ruído: zera
+        realPower = 0.0f;
       }
-      // Usar valor absoluto para potência
-      realPower = abs(realPower);
     }
     
-    // Calcular potência aparente: S = Vrms * Irms
+    // Calcular potência aparente: S = Vrms * Irms (antes do deadband)
     apparentPower = rmsVoltage * rmsCurrent;
+    
+    // Aplicar deadband: zerar valores abaixo do limiar (ruído)
+    if (abs(realPower) < P_NOLOAD_THRESHOLD && rmsCurrent < I_NOLOAD_THRESHOLD) {
+      realPower = 0.0f;
+      rmsCurrent = 0.0f;
+      apparentPower = 0.0f;
+      powerFactor = 0.0f;
+    }
     
     // Calcular fator de potência: FP = P / S
     // Usar a potência corrigida (já com abs se necessário) para calcular FP
@@ -228,6 +272,9 @@ void calculatePowerValues(float& rmsVoltage, float& rmsCurrent, float& realPower
       lastWarning = millis();
     }
   }
+  
+  // Resetar acumulador de ADC no final do cálculo (rastreia offset a cada segundo)
+  sumCurrentADC = 0;
 }
 
 // Medir corrente e tensão RMS (função legada - mantida para compatibilidade)

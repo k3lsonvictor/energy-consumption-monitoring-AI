@@ -28,9 +28,11 @@ bool useRealVoltage = true;                  // Usar tensão real ou fixa
 float sumV2 = 0.0;                           // Soma de v² (tensão instantânea ao quadrado)
 float sumI2 = 0.0;                           // Soma de i² (corrente instantânea ao quadrado)
 float sumP = 0.0;                            // Soma de v * i (potência instantânea)
+double sumCurrentADC = 0.0;                  // Soma dos valores ADC de corrente (para recalibração de offset)
 unsigned long samples = 0;                   // Contador de amostras válidas
 unsigned long lastCalculationTime = 0;       // Última vez que calculou valores RMS e potência
 const unsigned long calculationIntervalMs = 1000; // Intervalo para cálculo (1 segundo)
+const float noLoadThreshold = 0.15;          // Limiar para detectar ausência de carga (150mA)
 
 // ==========================================
 // DECLARAÇÕES DE FUNÇÕES (PROTOTYPES)
@@ -192,6 +194,7 @@ void loop() {
     sumV2 = 0.0;
     sumI2 = 0.0;
     sumP = 0.0;
+    sumCurrentADC = 0.0;  // Resetar acumulador de ADC para recalibração
     samples = 0;
     lastCalculationTime = currentTime;
   }
