@@ -1,0 +1,8 @@
+-- CreateTable
+CREATE TABLE "PowerReading" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "deviceId" INTEGER NOT NULL,
+    "powerW" REAL NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "PowerReading_deviceId_fkey" FOREIGN KEY ("deviceId") REFERENCES "Device" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);

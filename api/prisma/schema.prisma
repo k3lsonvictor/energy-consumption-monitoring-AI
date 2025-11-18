@@ -13,6 +13,7 @@ model Device {
   port        String    @unique   // ex: "A0", "A1", "A2"
   description String?
   readings    Reading[]
+  powerReadings PowerReading[]
   createdAt   DateTime  @default(now())
 }
 
@@ -21,6 +22,14 @@ model Reading {
   deviceId    Int
   energyWh    Float     // energia acumulada (Wh)
   durationMin Int       // tempo medido (minutos)
+  createdAt   DateTime  @default(now())
+  device      Device    @relation(fields: [deviceId], references: [id])
+}
+
+model PowerReading {
+  id          Int       @id @default(autoincrement())
+  deviceId    Int
+  powerW      Float     // potência atual (W)
   createdAt   DateTime  @default(now())
   device      Device    @relation(fields: [deviceId], references: [id])
 }

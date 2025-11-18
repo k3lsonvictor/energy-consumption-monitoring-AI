@@ -19,6 +19,8 @@ float voltageOffsetVoltage = 2.5;            // Offset do sensor de tensão (ZMP
 float totalEnergyWh = 0.0;                   // Energia acumulada total
 int saveCounter = 0;                         // Contador para salvar periodicamente
 unsigned long lastSaveTime = 0;               // Última vez que salvou no banco
+unsigned long lastPowerSaveTime = 0;          // Última vez que salvou potência (5 min)
+float lastCalculatedPower = 0.0;              // Última potência calculada (para enviar mesmo se samples=0)
 
 // Controles
 bool autoOffsetAdjust = false;               // Desabilitar ajuste automático por padrão
@@ -61,6 +63,7 @@ void handleWiFiManager();
 
 // Funções HTTP
 void sendDataToServer(float energy, float duration, float realPower = 0, float apparentPower = 0, float powerFactor = 0);
+void sendPowerToServer(float realPower);
 
 // Funções de comandos
 void processSerialCommands();
@@ -147,6 +150,11 @@ void loop() {
     // Calcular valores a partir dos acumuladores
     calculatePowerValues(rmsVoltage, rmsCurrent, realPower, apparentPower, measuredPowerFactor);
     
+    // Salvar última potência calculada (para usar quando enviar a cada 5 min)
+    if (samples > 0) {
+      lastCalculatedPower = realPower;
+    }
+    
     // Verificar e ajustar offset (se necessário)
     checkAndAdjustOffset(rmsCurrent);
     
@@ -206,7 +214,7 @@ void loop() {
     Serial.println("💾 Energia salva na EEPROM!");
   }
   
-  // Enviar dados para o servidor a cada 10 minutos
+  // Enviar dados para o servidor a cada 10 minutos (energia completa)
   if (WiFi.status() == WL_CONNECTED) {
     if (lastSaveTime == 0 || (currentTime - lastSaveTime >= saveIntervalMs)) {
       // Calcular valores finais para envio
@@ -222,6 +230,34 @@ void loop() {
       
       sendDataToServer(totalEnergyWh, 10.0, realPower, apparentPower, measuredPowerFactor);
       lastSaveTime = currentTime;
+    }
+    
+    // Enviar apenas potência a cada 5 minutos
+    if (lastPowerSaveTime == 0 || (currentTime - lastPowerSaveTime >= powerSaveIntervalMs)) {
+      // Tentar calcular valores atuais, mas usar último valor calculado se não houver amostras
+      float rmsVoltage = 0;
+      float rmsCurrent = 0;
+      float realPower = lastCalculatedPower; // Usar último valor como padrão
+      float apparentPower = 0;
+      float measuredPowerFactor = 0;
+      
+      // Se houver amostras válidas, calcular valores atuais
+      if (samples > 0) {
+        calculatePowerValues(rmsVoltage, rmsCurrent, realPower, apparentPower, measuredPowerFactor);
+        lastCalculatedPower = realPower; // Atualizar último valor
+      }
+      
+      // Só enviar se tiver um valor válido de potência
+      if (abs(realPower) > 0.001 || lastCalculatedPower != 0.0) {
+        Serial.print("💾 Enviando potência: ");
+        Serial.print(realPower, 2);
+        Serial.println(" W");
+        sendPowerToServer(realPower);
+      } else {
+        Serial.println("⚠️  Potência zero - não enviando");
+      }
+      
+      lastPowerSaveTime = currentTime;
     }
   } else {
     // Se WiFi desconectado, mostrar aviso ocasionalmente

@@ -11,9 +11,9 @@ export class ReadingController {
    */
   async criar(req, res) {
     try {
-      const { port, energyWh, durationMin } = req.body;
+      const { port, energyWh, durationMin, realPower } = req.body;
       
-      console.log("Recebido:", { port, energyWh, durationMin, body: req.body });
+      console.log("📊 READING - Recebido:", { port, energyWh, durationMin, realPower, body: req.body });
     
       // Validação dos campos obrigatórios
       if (!port) {
@@ -24,6 +24,15 @@ export class ReadingController {
       }
       if (durationMin === undefined || durationMin === null) {
         return res.status(400).json({ error: "Campo 'durationMin' é obrigatório" });
+      }
+      
+      // Rejeitar leituras que parecem ser de potência (energyWh = 0 e durationMin = 5)
+      // Essas devem ir para /power, não para /readings
+      if (energyWh === 0 && durationMin === 5 && realPower !== undefined) {
+        return res.status(400).json({ 
+          error: "Esta parece ser uma leitura de potência. Use o endpoint /power em vez de /readings",
+          hint: "Envie para POST /power com { port, realPower }"
+        });
       }
     
       // Encontra o dispositivo pela porta

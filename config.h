@@ -5,6 +5,7 @@
 // Configurações Wi-Fi
 // Nota: SSID e password são salvos via Preferences (WiFi Manager)
 const char* serverUrl = "http://192.168.1.110:5000/readings";
+const char* powerServerUrl = "http://192.168.1.110:5000/power";
 
 // Pinos dos sensores
 const int sensorPin = 34;        // Sensor de corrente (ACS712)
@@ -30,4 +31,5 @@ const float noiseThreshold = 0.2; // Threshold para ignorar ruído
 
 // Configurações de salvamento
 const unsigned long saveIntervalMs = 600000; // 10 minutos em millisegundos
+const unsigned long powerSaveIntervalMs = 300000; // 5 minutos em millisegundos (para salvar potência)
 
