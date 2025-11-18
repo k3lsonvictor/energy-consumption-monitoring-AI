@@ -1,0 +1,27 @@
+{
+  "timestamp": "2025-11-18T22:45:20.484Z",
+  "config": {
+    "apiUrl": "http://localhost:5000",
+    "totalRequests": 5000,
+    "concurrentRequests": 50,
+    "duration": 60
+  },
+  "stats": {
+    "duration": 52.351,
+    "avgResponseTime": 5.0484,
+    "minResponseTime": 0,
+    "maxResponseTime": 69,
+    "p50": 4,
+    "p95": 11,
+    "p99": 13,
+    "requestsPerSecond": 95.5091593283796,
+    "errorRate": 0,
+    "availability": 100,
+    "totalRequests": 5000,
+    "successfulRequests": 5000,
+    "failedRequests": 0,
+    "error4xx": 0,
+    "error5xx": 0
+  },
+  "errors": []
+}

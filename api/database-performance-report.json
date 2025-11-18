@@ -1,0 +1,44 @@
+{
+  "timestamp": "2025-11-18T22:52:05.333Z",
+  "config": {
+    "totalInserts": 500,
+    "totalQueries": 200,
+    "databasePath": "/home/kelson/Arduino/sketch_aug26a/api/prisma/dev.db"
+  },
+  "database": {
+    "currentSizeMB": 0.09765625,
+    "growthDuringTestMB": 0.01171875,
+    "estimatedGrowthPerMonthMB": 0.30375
+  },
+  "insertions": {
+    "total": 500,
+    "successful": 500,
+    "failed": 0,
+    "failureRate": 0,
+    "stats": {
+      "avgTime": 3.686,
+      "minTime": 3,
+      "maxTime": 7,
+      "p50": 4,
+      "p95": 5,
+      "p99": 7
+    }
+  },
+  "queries": {
+    "total": 200,
+    "successful": 200,
+    "failed": 0,
+    "stats": {
+      "avgTime": 2.05,
+      "minTime": 0,
+      "maxTime": 5,
+      "p50": 2,
+      "p95": 4,
+      "p99": 4
+    }
+  },
+  "errors": {
+    "insertions": [],
+    "queries": []
+  }
+}

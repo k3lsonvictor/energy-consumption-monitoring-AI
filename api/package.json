@@ -1,7 +1,14 @@
 {
   "type": "module",
   "scripts": {
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "test:perf": "node scripts/performance-test.js",
+    "test:perf:quick": "DURATION=10 TOTAL=100 CONCURRENT=5 node scripts/performance-test.js",
+    "test:perf:stress": "DURATION=60 TOTAL=5000 CONCURRENT=50 node scripts/performance-test.js",
+    "test:perf:autocannon": "node scripts/performance-test-autocannon.js",
+    "test:db": "node scripts/database-performance-test.js",
+    "test:db:quick": "TOTAL_INSERTS=50 TOTAL_QUERIES=25 node scripts/database-performance-test.js",
+    "test:db:full": "TOTAL_INSERTS=500 TOTAL_QUERIES=200 node scripts/database-performance-test.js"
   },
   "dependencies": {
     "@prisma/client": "^6.17.0",
